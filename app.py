@@ -367,7 +367,7 @@ def chat():
         if is_smalltalk(msg):
             rep = "Hello! How can I help you?"
             rep = translate(rep, lang, mood)
-            audio = make_tts(rep, lang) if voice else None
+            audio_url = make_tts(reply, language) if voice_flag else None
             return jsonify({"reply":rep, "audio_url":audio})
 
         reply = None
