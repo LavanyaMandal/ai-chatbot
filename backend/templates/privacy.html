@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Privacy & Data Control</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <!-- Theme toggle top-right is controlled from the same CSS/JS -->
+  <button id="themeToggleTop" class="theme-toggle">🌙 Dark</button>
+
+  <div class="privacy-container">
+    <h1>🔒 Privacy & Data Control</h1>
+
+    <div class="privacy-actions">
+      <button id="exportBtn">📂 Export My Data</button>
+      <button id="deleteBtn">🗑 Delete My Data</button>
+    </div>
+
+    <pre id="exportOutput" class="export-output"></pre>
+  </div>
+
+  <script>
+    // Sync theme toggle across pages using localStorage (same logic as main page)
+    (function initTheme() {
+      const saved = localStorage.getItem("theme") || "light";
+      document.documentElement.setAttribute("data-theme", saved);
+      const btns = document.querySelectorAll("#themeToggleTop");
+      btns.forEach(b => {
+        b.textContent = saved === "light" ? "🌙 Dark" : "☀️ Light";
+        b.addEventListener("click", () => {
+          const cur = document.documentElement.getAttribute("data-theme") || "light";
+          const next = cur === "light" ? "dark" : "light";
+          document.documentElement.setAttribute("data-theme", next);
+          localStorage.setItem("theme", next);
+          btns.forEach(x => x.textContent = next === "light" ? "🌙 Dark" : "☀️ Light");
+        });
+      });
+    })();
+
+    // Privacy controls (use your backend endpoints)
+    document.getElementById("exportBtn").addEventListener("click", async () => {
+      const res = await fetch("/export-data");
+      const data = await res.json();
+      document.getElementById("exportOutput").textContent = JSON.stringify(data, null, 2);
+    });
+
+    document.getElementById("deleteBtn").addEventListener("click", async () => {
+      if (!confirm("Delete all your data? This cannot be undone.")) return;
+      const res = await fetch("/delete-data", { method: "DELETE" });
+      const data = await res.json();
+      alert(data.message || "Deleted.");
+    });
+  </script>
+</body>
+</html>
