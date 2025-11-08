@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Voice Debug Tool</title>
+<style>
+body{font-family:Arial;background:#111;color:#fff;padding:20px}
+button{padding:10px 20px;margin:8px;border:none;border-radius:6px;cursor:pointer;font-size:16px}
+#log{background:#000;padding:15px;height:250px;overflow:auto;border-radius:5px;font-size:14px}
+.btn{background:#444;color:#fff} 
+.btn:hover{background:#666}
+h2{margin-top:0}
+</style>
+</head>
+<body>
+
+<h2>🎤 AI Voice Debug Panel</h2>
+<p>Use this to test mic, wake word, & speech log.</p>
+
+<button class="btn" id="testMic">▶️ Test Mic</button>
+<button class="btn" id="testWake">🛎 Test Wake Word Mode</button>
+<button class="btn" id="stop">⛔ Stop Recognition</button>
+
+<h3>Logs</h3>
+<div id="log"></div>
+
+<script>
+const log = (msg)=>{document.getElementById("log").innerHTML+= msg+"<br>";};
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if(!SR){ log("❌ SpeechRecognition not supported in this browser."); }
+
+let rec = null;
+let wake = null;
+const wakeWords=["hey ai","ok ai","okay ai","assistant","hey assistant"];
+
+function startMicTest(){
+    stopAll();
+    rec = new SR();
+    rec.lang="en-IN";
+    rec.onresult=e=>{
+        let t=e.results[0][0].transcript;
+        log("🎧 Mic heard: "+t);
+    };
+    rec.onend=()=>log("ℹ️ Mic listening ended");
+    rec.onerror=e=>log("❗ Mic Error: "+e.error);
+    rec.start();
+    log("🎤 Mic test started... Speak now!");
+}
+
+function startWakeTest(){
+    stopAll();
+    wake = new SR();
+    wake.lang="en-IN";
+    wake.continuous=true;
+    wake.interimResults=true;
+
+    wake.onresult=e=>{
+        let txt="";
+        for(let i=e.resultIndex;i<e.results.length;i++){
+            txt+=e.results[i][0].transcript.toLowerCase()+" ";
+        }
+        log("👂 Wake listening: "+txt);
+
+        if(wakeWords.some(w=>txt.includes(w))){
+            log("✅ Wake word detected");
+            speechSynthesis.cancel();
+            speechSynthesis.speak(new SpeechSynthesisUtterance("Yes?"));
+        }
+    };
+
+    wake.onerror=e=>log("❗ Wake Error: "+e.error);
+    wake.onend=()=>log("ℹ️ Wake listening stopped");
+    wake.start();
+    log("🛎 Wake-word mode ON — say 'Hey AI'");
+}
+
+function stopAll(){
+    try{rec && rec.stop();}catch{}
+    try{wake && wake.stop();}catch{}
+    log("⛔ All recognition stopped");
+}
+
+document.getElementById("testMic").onclick=startMicTest;
+document.getElementById("testWake").onclick=startWakeTest;
+document.getElementById("stop").onclick=stopAll;
+</script>
+
+</body>
+</html>

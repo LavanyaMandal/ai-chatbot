@@ -1,0 +1,26 @@
+[
+  {
+    "who": "user",
+    "text": "How many students are there in VIT-AP University?"
+  },
+  {
+    "who": "bot",
+    "text": "3067"
+  },
+  {
+    "who": "user",
+    "text": "Hello."
+  },
+  {
+    "who": "bot",
+    "text": "\"Hello\" is:\n* A song by British singer-songwriter Adele, released on 23 October 2015.\n* A song by Lionel Richie.\n* The name of a US Edition for news and photos (HELLO! US Edition)."
+  },
+  {
+    "who": "user",
+    "text": "How are you?"
+  },
+  {
+    "who": "bot",
+    "text": "I'm fine, thanks."
+  }
+]
