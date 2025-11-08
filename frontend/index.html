@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Welcome to BrainBox</title>
+
+  <!-- ✅ Use static path -->
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<div class="app-root">
+
+  <!-- SLIDE-OUT SIDEBAR -->
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-head">
+      <div class="brand">
+        <span class="logo">🤖</span>
+        <span class="brand-text">BrainBox</span>
+      </div>
+      <button id="closeSidebar" class="icon-btn sm">✖</button>
+    </div>
+
+    <button id="newChat" class="side-btn">＋ New Chat</button>
+    <button id="exportData" class="side-btn">⬇ Export</button>
+    <button id="deleteData" class="side-btn danger">🗑 Clear All</button>
+    <button id="dashboardBtn" class="side-btn">🗂 Assistant Dashboard</button>
+
+    <div class="divider"></div>
+
+    <div class="side-field">
+      <label>Mode</label>
+      <select id="modeSelect" class="select">
+        <option value="default">Default</option>
+        <option value="developer">Developer</option>
+        <option value="educational">Educational</option>
+        <option value="fun">Fun</option>
+        <option value="professional">Professional</option>
+        <option value="motivational">Motivational</option>
+      </select>
+    </div>
+
+    <div class="side-field">
+      <label>Language</label>
+      <select id="langSelect" class="select">
+        <option value="auto">Auto Detect</option>
+        <option value="en">English</option>
+        <option value="hi">Hindi</option>
+        <option value="hinglish">Hinglish</option>
+        <option value="es">Spanish</option>
+        <option value="fr">French</option>
+      </select>
+    </div>
+
+    <div class="side-field toggles">
+      <label><input id="serverVoiceCheckbox" type="checkbox"> Server Voice</label>
+      <label><input id="autoSpeakCheckbox" type="checkbox" checked> Auto Speak</label>
+    </div>
+  </aside>
+
+  <div id="overlay" class="overlay"></div>
+
+  <main class="main">
+    <header class="topbar">
+      <button id="openSidebarBtn" class="toggle-btn">☰</button>
+      <h1 class="title">✨ Your AI</h1>
+      <button id="themeToggle" class="icon-btn moon">🌙</button>
+    </header>
+
+    <section id="chatbox" class="chatbox">
+      <div class="msg bot">👋 Hey there!</div>
+    </section>
+
+    <footer class="inputbar">
+      <textarea id="userInput" placeholder="Ask something..." spellcheck="true"></textarea>
+      <input type="file" id="fileInput" hidden>
+      <button id="uploadBtn" class="icon-btn attach">📎</button>
+      <button id="micBtn" class="icon-btn mic">🎤</button>
+      <button id="sendBtn" class="send-btn">➤</button>
+    </footer>
+  </main>
+</div>
+
+<!-- DASHBOARD MODAL -->
+<div id="dashboardModal" class="dash hidden">
+  <div class="dash-card">
+    <div class="dash-head">
+      <h3>Assistant Dashboard 🗂</h3>
+      <button id="closeDash" class="icon-btn sm">✖</button>
+    </div>
+    <div id="remList" class="rem-list">Loading reminders...</div>
+    <div class="rem-add">
+      <input id="newReminder" class="rem-input" placeholder="New reminder..."/>
+      <button id="addRem" class="side-btn">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ Correct JS path -->
+<script src="./script.js"></script>
+</body>
+</html>
