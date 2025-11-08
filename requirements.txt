@@ -31,3 +31,4 @@ typing-inspection
 httplib2
 google-search-results
 gTTS
+requests

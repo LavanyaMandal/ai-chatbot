@@ -26,12 +26,15 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
+else:
+    logging.warning("GOOGLE_API_KEY missing!")
 
 MODEL_LIST = ["gemini-2.0-flash-exp", "gemini-2.5-flash"]
 _MODELS = []
 for m in MODEL_LIST:
     try:
-        _MODELS.append(genai.GenerativeModel(m))
+        _MODELS.append(genai.GenerativeModel(model_name=m))
+        logging.info(f"Loaded model: {m}")
     except Exception as e:
         logging.warning(f"Model init failed: {m}: {e}")
 
@@ -84,12 +87,12 @@ def load_json(p: Path, fb):
 def save_json(p: Path, obj):
     write_txt(p, json.dumps(obj, indent=2, ensure_ascii=False))
 
-# ---------------- PERSONALITY / LANG (UNCHANGED) ----------------
+# ---------------- PERSONALITY / LANG ----------------
 PERSONALITY = {
     "default": "Friendly and natural.",
     "educational": "Clear, simple teacher tone with examples.",
     "developer": "Technical and precise. Short and direct.",
-    "fun": "High-energy, playful, expressive. Do NOT mix languages unless Hinglish.",
+    "fun": "High-energy, playful, expressive.",
     "professional": "Concise and formal.",
     "motivational": "Uplifting and encouraging."
 }
@@ -126,28 +129,19 @@ TEXT:
 
 def is_smalltalk(t):
     t = (t or "").lower().strip()
-    small_words = ["hi", "hii", "hiii", "hiiii", "hey", "heyy", "heyyy", "hello", "hola", "namaste", "yo"]
-
-    # Check simple matches
-    if t in small_words:
-        return True
-
-    # Check relaxed smalltalk patterns
-    if re.fullmatch(r"h+i+", t):  # matches hi, hii, hiii, hhhiiiii
-        return True
-    if re.fullmatch(r"he+y+", t): # hey, heyy, heyyy
-        return True
-
+    small_words = ["hi","hii","hiii","hey","heyy","hello","hola","namaste","yo"]
+    if t in small_words: return True
+    if re.fullmatch(r"h+i+", t): return True
+    if re.fullmatch(r"he+y+", t): return True
     return False
 
-# ---------------- OCR & DOC QA (UNCHANGED) ----------------
+# ---------------- OCR & DOC ----------------
 def is_ocr_query(text):
     if not text: return False
     t = text.lower()
     keys = [
-        "what is written in the image",
-        "image mein kya","image me kya","text in image","read the image",
-        "ocr","picture me kya","photo me kya","what is the text written"
+        "what is written in the image","image mein kya","image me kya",
+        "text in image","read the image","ocr","picture me kya","photo me kya"
     ]
     return any(k in t for k in keys)
 
@@ -165,7 +159,7 @@ Answer:
 """
     return _llm(prompt)
 
-# ---------------- WEB SEARCH (UNCHANGED) ----------------
+# ---------------- WEB SEARCH ----------------
 def serp(q):
     if not SERPAPI_KEY:
         return []
@@ -191,37 +185,6 @@ Answer:
 """
     return _llm(prompt)
 
-# ---------------- REMINDERS (UPDATED) ----------------
-def add_rem(text):
-    items = load_json(REM, [])
-    due = datetime.now(timezone.utc) + timedelta(minutes=1)
-    items.append({
-        "id": str(uuid.uuid4()),
-        "task": text,
-        "due_ts": due.isoformat(),
-        "delivered": False
-    })
-    save_json(REM, items)
-    return due.isoformat()
-
-# ---------------- TTS (UNCHANGED) ----------------
-GTT_LANG = {"en":"en","es":"es","fr":"fr","hi":"hi","hinglish":"en","auto":"en"}
-
-def make_tts(text, lang):
-    try:
-        # speak only letters/numbers/basic punctuation
-        clean = re.sub(r"[^0-9A-Za-zÀ-ž\s\.,!\?\-']", " ", text or "")
-        clean = re.sub(r"\s+", " ", clean).strip()
-        code = GTT_LANG.get(lang, "en")
-        tts = gTTS(text=clean or " ", lang=code)
-        fname = f"tts_{uuid.uuid4().hex}.mp3"
-        path = TTS_DIR / fname
-        tts.save(str(path))
-        return f"/static/tts/{fname}"
-    except Exception as e:
-        logging.warning(f"TTS ERROR: {e}")
-        return None
-
 # ---------------------------------------------------------
 # APP INIT
 # ---------------------------------------------------------
@@ -232,11 +195,19 @@ CORS(app)
 def health():
     return {"status": "ok"}
 
+@app.route("/env-check")
+def env_check():
+    return {
+        "GOOGLE_API_KEY": bool(GOOGLE_API_KEY),
+        "SERPAPI_KEY": bool(SERPAPI_KEY),
+        "models_loaded": [getattr(m, "_model", "unknown") for m in _MODELS]
+    }
+
 @app.route("/")
 def home():
     return {"status": "Backend running"}
 
-# ---------------- REMINDER ROUTES (NEW) ----------------
+# ---------------- REMINDER ROUTES ----------------
 @app.route("/dashboard")
 def dashboard():
     return jsonify(load_json(REM, []))
@@ -266,9 +237,7 @@ def reminders_ack():
     save_json(REM, items)
     return jsonify({"ok": True})
 
-# ---------------------------------------------------------
-# CHAT (UNCHANGED except reminder call)
-# ---------------------------------------------------------
+# ---------------- CHAT ----------------
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json() or {}
@@ -304,6 +273,7 @@ def chat():
         ans = doc_answer(msg, read_txt(DOC))
         if ans and ans != "Not in document":
             reply = ans
+
     if reply is None:
         reply = web_answer(msg)
 
@@ -317,25 +287,30 @@ def chat():
 
     return jsonify({"reply":reply, "audio_url":audio})
 
-# ---------------- DOC / IMAGE / EXPORT / DELETE (UNCHANGED) ----------------
+# ---------------- DOC / IMAGE / EXPORT ----------------
 @app.route("/upload-doc", methods=["POST"])
 def upload_doc():
     try:
         f = request.files["file"]
         ext = f.filename.lower().split(".")[-1]
         text=""
+
         if ext=="txt":
             text = f.read().decode("utf-8","ignore")
+
         elif ext=="pdf":
             reader = PyPDF2.PdfReader(f)
             text = "\n".join([(p.extract_text() or "") for p in reader.pages])
+
         elif ext in ["doc","docx"]:
             with tempfile.NamedTemporaryFile(delete=True, suffix=".docx") as tmp:
                 f.save(tmp.name)
                 text = docx2txt.process(tmp.name)
+
         write_txt(DOC, text)
         summary = _llm("Summarize in 5 points:\n"+text[:2000])
         return jsonify({"message":"✅ Document uploaded", "analysis":summary})
+
     except Exception as e:
         return jsonify({"error":str(e)}),500
 
@@ -362,7 +337,7 @@ def delete_data():
     return jsonify({"ok":True})
 
 # ---------------------------------------------------------
-# RUN
+# RUN (Render friendly)
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True, threaded=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
