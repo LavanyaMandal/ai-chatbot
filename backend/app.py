@@ -212,12 +212,16 @@ def make_tts(text, lang):
 # ---------------------------------------------------------
 # APP INIT
 # ---------------------------------------------------------
-app = Flask(__name__, template_folder="templates", static_folder="static")
+app = Flask(__name__)
 CORS(app)
+
+@app.route("/health")
+def health():
+    return {"status": "ok"}
 
 @app.route("/")
 def home():
-    return render_template("index.html")
+    return {"status": "Backend running"}
 
 # ---------------- REMINDER ROUTES (NEW) ----------------
 @app.route("/dashboard")
