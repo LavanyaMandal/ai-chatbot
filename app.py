@@ -344,58 +344,71 @@ def upload_image():
 @app.route("/chat", methods=["POST"])
 def chat():
     try:
-        data = request.json or {}
+        data = request.get_json(silent=True) or {}
         msg = (data.get("message") or "").strip()
-        lang = data.get("language","auto")
-        mood = data.get("mode","default")
-        voice = bool(data.get("voice_enabled", False))
+        language = (data.get("language") or "auto").lower()
+        mode = data.get("mode","default")
+        voice_flag = bool(data.get("voice_enabled", False))
 
-        # reset
-        if msg.lower() in ["clear","reset","new chat"]:
-            save_json(HISTORY, [])
-            if DOC.exists(): DOC.unlink()
-            if IMG.exists(): IMG.unlink()
-            save_json(REM, [])
-            return jsonify({"reply":"✨ New chat started!"})
+        if not msg:
+            return jsonify({
+                "reply": "Say something to start the chat.",
+                "audio_url": None
+            })
 
-        # reminder
-        if msg.lower().startswith("remind"):
+        # RESET CHAT
+        if msg.lower() in ["new chat","reset","clear","clear chat"]:
+            save_json(HISTORY,[])
+            if DOC.exists():
+                try: DOC.unlink()
+                except: pass
+            if IMG.exists():
+                try: IMG.unlink()
+                except: pass
+            save_json(REMINDERS, [])
+            return jsonify({"reply":"✨ New chat started!", "audio_url": None})
+
+        # REMINDERS
+        if msg.lower().startswith(("remind me","set reminder")):
             due = add_reminder(msg)
-            return jsonify({"reply":f"✅ Reminder added (due: {due})"})
+            return jsonify({"reply": f"🗓️ Reminder added! (due: {due})", "audio_url": None})
 
-        # smalltalk
+        # SMALLTALK
         if is_smalltalk(msg):
             rep = "Hello! How can I help you?"
-            rep = translate(rep, lang, mood)
-            audio_url = make_tts(reply, language) if voice_flag else None
-            return jsonify({"reply":rep, "audio_url":audio})
+            rep = translate(rep, language, mode)
+            audio_url = make_tts_audio(rep, language) if voice_flag else None
+            return jsonify({"reply": rep, "audio_url": audio_url})
 
+        # DOCUMENT ANSWER
         reply = None
-
-        # doc QA
         if DOC.exists():
-            doc_txt = read_txt(DOC)
-            ans = doc_answer(msg, doc_txt)
-            if ans and ans != "Not in document":
-                reply = ans
+            out = doc_answer(msg, read_txt(DOC))
+            if out and out.strip() != "Not in document":
+                reply = out
 
+        # WEB ANSWER
         if reply is None:
             reply = web_answer(msg)
 
-        reply = translate(reply, lang, mood)
-        audio = make_tts(reply, lang) if voice else None
+        # TRANSLATE
+        reply = translate(reply, language, mode)
 
-        # history
+        # ✅ FIXED — use correct TTS function
+        audio_url = make_tts_audio(reply, language) if voice_flag else None
+
+        # HISTORY SAVE
         hist = load_json(HISTORY, [])
-        hist.append({"who":"user","msg":msg})
-        hist.append({"who":"bot","msg":reply})
+        now = datetime.now(timezone.utc).isoformat()
+        hist.append({"who":"user","text":msg,"ts": now})
+        hist.append({"who":"bot","text":reply,"ts": now})
         save_json(HISTORY, hist[-200:])
 
-        return jsonify({"reply":reply, "audio_url":audio})
+        return jsonify({"reply": reply, "audio_url": audio_url})
 
     except Exception as e:
         logging.exception("CHAT ERROR")
-        return jsonify({"error":str(e)}),500
+        return jsonify({"error": str(e)}),500
 
 # ---------------------------------------------------------
 # EXPORT / DELETE

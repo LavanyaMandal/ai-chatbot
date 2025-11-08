@@ -2,13 +2,19 @@
 const API = "https://ai-chatbot-ishk.onrender.com";
 
 document.addEventListener("DOMContentLoaded", () => {
+
   const $ = id => document.getElementById(id);
   const chatbox = $("chatbox");
   const input = $("userInput");
 
-  const escapeHtml = (s)=> String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  const checked = id => $(id) ? $(id).checked : false;
+  const escapeHtml = (s)=> String(s).replace(/[&<>"']/g, m=>(
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]
+  ));
 
+  const checked = id => $(id) ? $(id).checked : false;
+  const val = (id, fb) => $(id) ? $(id).value : fb;
+
+  // ---------- In-app pretty toast (bottom-right) ----------
   function ensureToastHost(){
     if ($("toastHost")) return $("toastHost");
     const host = document.createElement("div");
@@ -53,11 +59,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const snooze = document.createElement("button");
     snooze.textContent = "Snooze 5 min";
-    snooze.className = "btn-snooze";
+    snooze.style.background = "#1f2843";
+    snooze.style.color = "#dbe3ff";
+    snooze.style.border = "1px solid #2b3968";
+    snooze.style.borderRadius = "10px";
+    snooze.style.padding = "6px 10px";
+    snooze.style.cursor = "pointer";
 
     const done = document.createElement("button");
     done.textContent = "Done";
-    done.className = "btn-done";
+    done.style.background = "#2f6bff";
+    done.style.color = "#fff";
+    done.style.border = "none";
+    done.style.borderRadius = "10px";
+    done.style.padding = "6px 10px";
+    done.style.cursor = "pointer";
 
     row.appendChild(snooze);
     row.appendChild(done);
@@ -83,28 +99,45 @@ document.addEventListener("DOMContentLoaded", () => {
       card.remove();
     };
   }
+  // --------------------------------------------------------
 
+  // Render messages
   function user(msg){
-    chatbox.insertAdjacentHTML("beforeend", `<div class="msg user">${escapeHtml(msg)}</div>`);
+    chatbox.insertAdjacentHTML("beforeend",
+      `<div class="msg user">${escapeHtml(msg)}</div>`);
     chatbox.scrollTop = chatbox.scrollHeight;
   }
+
   function bot(msg){
-    chatbox.insertAdjacentHTML("beforeend", `<div class="msg bot">${escapeHtml(msg)}</div>`);
+    chatbox.insertAdjacentHTML("beforeend",
+      `<div class="msg bot">${escapeHtml(msg)}</div>`);
     chatbox.scrollTop = chatbox.scrollHeight;
   }
+
   function showTyping(){
-    chatbox.insertAdjacentHTML("beforeend", `<div id="typing" class="msg bot">typing…</div>`);
+    chatbox.insertAdjacentHTML("beforeend",
+      `<div id="typing" class="msg bot">typing…</div>`);
     chatbox.scrollTop = chatbox.scrollHeight;
   }
+
   function hideTyping(){
-    const t = document.getElementById("typing");
+    let t = $("typing");
     if (t) t.remove();
   }
 
   // Sidebar
-  $("openSidebarBtn").onclick = () => { $("sidebar").classList.add("show"); $("overlay").classList.add("show"); };
-  $("closeSidebar").onclick = () => { $("sidebar").classList.remove("show"); $("overlay").classList.remove("show"); };
-  $("overlay").onclick = () => { $("sidebar").classList.remove("show"); $("overlay").classList.remove("show"); };
+  $("openSidebarBtn").onclick = () => {
+    $("sidebar").classList.add("show");
+    $("overlay").classList.add("show");
+  };
+  $("closeSidebar").onclick = () => {
+    $("sidebar").classList.remove("show");
+    $("overlay").classList.remove("show");
+  };
+  $("overlay").onclick = () => {
+    $("sidebar").classList.remove("show");
+    $("overlay").classList.remove("show");
+  };
 
   // Theme toggle
   $("themeToggle").onclick = () => {
@@ -112,11 +145,14 @@ document.addEventListener("DOMContentLoaded", () => {
     $("themeToggle").textContent = isLight ? "☀️" : "🌙";
   };
 
-  // Send
+  // MAIN SEND FUNCTION
   async function sendMsg(){
     const text = input.value.trim();
     if (!text) return;
-    user(text); input.value = ""; showTyping();
+
+    user(text);
+    input.value = "";
+    showTyping();
 
     try {
       const res = await fetch(`${API}/chat`, {
@@ -129,81 +165,137 @@ document.addEventListener("DOMContentLoaded", () => {
           mode: document.getElementById("modeSelect")?.value || "default"
         })
       });
-      const data = await res.json(); hideTyping();
 
-      if (data.error){ bot("⚠️ " + data.error); return; }
+      const data = await res.json();
+      hideTyping();
+
+      if (data.error){
+        bot("⚠️ " + data.error);
+        return;
+      }
+
       bot(String(data.reply || ""));
 
       if (data.audio_url) {
         try {
-          const audio = new Audio(data.audio_url);
-          await audio.play();
+          let audio = new Audio(data.audio_url);
+          audio.play().catch(err => console.log("Autoplay blocked:", err));
         } catch (err) {
-          console.log("Audio autoplay blocked:", err);
+          console.log("Audio play failed:", err);
         }
       }
+
     } catch (err){
-      hideTyping(); bot("⚠️ Network error.");
+      hideTyping();
+      bot("⚠️ Network error.");
     }
   }
 
-  document.getElementById("sendBtn").onclick = sendMsg;
+  $("sendBtn").onclick = sendMsg;
+
   input.addEventListener("keydown", e => {
-    if (e.key === "Enter" && !e.shiftKey){ e.preventDefault(); sendMsg(); }
+    if (e.key === "Enter" && !e.shiftKey){
+      e.preventDefault();
+      sendMsg();
+    }
   });
 
   // New chat
-  document.getElementById("newChat").onclick = async () => {
+  $("newChat").onclick = async () => {
     showTyping();
-    await fetch(`${API}/chat`, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ message: "clear" }) });
-    hideTyping(); location.reload();
+    await fetch(`${API}/chat`, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ message: "clear" })
+    });
+    hideTyping();
+    location.reload();
   };
 
   // Export / Delete
-  document.getElementById("exportData").onclick = () => window.open(`${API}/export-data`, "_blank");
-  document.getElementById("deleteData").onclick = async () => { await fetch(`${API}/delete-data`, {method: "DELETE"}); location.reload(); };
+  $("exportData").onclick = () =>
+    window.open(`${API}/export-data`, "_blank");
 
-  // Upload
-  document.getElementById("uploadBtn").onclick = () => document.getElementById("fileInput").click();
-  document.getElementById("fileInput").onchange = async ()=>{
-    const f = document.getElementById("fileInput").files[0];
+  $("deleteData").onclick = async () => {
+    await fetch(`${API}/delete-data`, {method: "DELETE"});
+    location.reload();
+  };
+
+  // Upload file
+  $("uploadBtn").onclick = () => $("fileInput").click();
+  $("fileInput").onchange = async ()=>{
+    const f = $("fileInput").files[0];
     if (!f) return;
-    const fd = new FormData(); fd.append("file", f);
-    const endpoint = f.type.startsWith("image") ? `${API}/upload-image` : `${API}/upload-doc`;
+    const fd = new FormData();
+    fd.append("file", f);
+
+    const endpoint = f.type.startsWith("image")
+      ? `${API}/upload-image`
+      : `${API}/upload-doc`;
+
     showTyping();
     const r = await fetch(endpoint, {method:"POST", body: fd});
-    const d = await r.json(); hideTyping();
+    const d = await r.json();
+    hideTyping();
+
     if (d.error) bot("⚠️ " + d.error);
     if (d.message) bot(d.message);
     if (d.analysis) bot(d.analysis);
     if (d.ocr_text) bot("OCR captured.");
   };
 
-  // Speech recognition (page mic)
+  // Speech recognition
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (SR && document.getElementById("micBtn")){
+  if (SR && $("micBtn")){
     const rec = new SR();
     rec.lang = "en-IN";
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
-    rec.onresult = e => { input.value = e.results[0][0].transcript; sendMsg(); };
-    rec.onerror = e => { bot("🎙️ Mic error: " + (e.error || "unknown")); };
-    document.getElementById("micBtn").onclick = ()=> rec.start();
-  } else {
-    // Non-supported browsers
-    // bot("🎙️ Voice input not supported in this browser.");
+    rec.onresult = e => {
+      input.value = e.results[0][0].transcript;
+      sendMsg();
+    };
+    $("micBtn").onclick = ()=> rec.start();
   }
 
-  // OS Notifications + polling via Service Worker
+  // Dashboard open
+  $("dashboardBtn").onclick = async ()=>{
+    $("dashboardModal").classList.remove("hidden");
+    $("remList").textContent = "Loading...";
+    try{
+      const r = await fetch(`${API}/dashboard`);
+      const data = await r.json();
+      $("remList").innerHTML = (Array.isArray(data) && data.length)
+        ? data.map(x => `✅ ${escapeHtml(x.task || "")}`).join("<br>")
+        : "No reminders yet";
+    }catch(e){
+      $("remList").textContent = "Failed to load reminders.";
+    }
+  };
+  $("closeDash").onclick = () => $("dashboardModal").classList.add("hidden");
+
+  $("addRem").onclick = async ()=>{
+    const v = $("newReminder").value.trim();
+    if (!v) return;
+    try{
+      const r = await fetch(`${API}/chat`, {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ message: "remind me " + v })
+      });
+      const d = await r.json();
+      bot(String(d.reply || "Reminder added."));
+      $("newReminder").value = "";
+    }catch(e){
+      bot("⚠️ Could not add reminder.");
+    }
+  };
+
+  // ---------- OS Notifications + polling ----------
   async function setupNotifications(){
     if (!("serviceWorker" in navigator)) return;
 
     try {
-      // IMPORTANT: we must have /static/sw.js file on server
       await navigator.serviceWorker.register("/static/sw.js");
-    } catch (e) {
-      console.log("SW register failed", e);
-    }
+    } catch (e) {}
 
     if (window.Notification && Notification.permission === "default"){
       try { await Notification.requestPermission(); } catch (_) {}
@@ -214,9 +306,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const r = await fetch(`${API}/reminders-due`);
         if (!r.ok) throw new Error("HTTP "+r.status);
         const due = await r.json();
+
         if (Array.isArray(due) && due.length){
           const reg = await navigator.serviceWorker.getRegistration();
           for (const rem of due){
+
             if (reg && Notification.permission === "granted"){
               reg.showNotification("⏰ Reminder", {
                 body: (rem.task || "").replace(/^remind( me)?/i,"").trim() || rem.task,
@@ -229,7 +323,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 ]
               });
             }
+
             showReminderToast(rem);
+
             await fetch(`${API}/reminders-ack`, {
               method:"POST",
               headers:{"Content-Type":"application/json"},
@@ -238,7 +334,6 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
       }catch(e){
-        // silent
       }finally{
         setTimeout(poll, 15000);
       }
@@ -246,4 +341,38 @@ document.addEventListener("DOMContentLoaded", () => {
     poll();
   }
   setupNotifications();
+  // ----------------------------------------------------
+
 });
+
+// Basic SW for reminder actions
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener("notificationclick", (event) => {
+  const data = event.notification && event.notification.data || {};
+  const id = data.id;
+  const action = event.action;
+
+  event.notification.close();
+
+  if (!id) return;
+
+  let body = { id };
+  if (action === "snooze-5") body.snooze_minutes = 5;
+
+  event.waitUntil(
+    fetch(`${API}/reminders-ack`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).catch(()=>{})
+  );
+});
+
+self.addEventListener("notificationclose", () => {});
