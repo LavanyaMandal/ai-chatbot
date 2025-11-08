@@ -125,7 +125,20 @@ TEXT:
     return _llm(prompt) or reply
 
 def is_smalltalk(t):
-    return (t or "").lower().strip() in ["hi","hello","hey","hola","namaste","bonjour"]
+    t = (t or "").lower().strip()
+    small_words = ["hi", "hii", "hiii", "hiiii", "hey", "heyy", "heyyy", "hello", "hola", "namaste", "yo"]
+
+    # Check simple matches
+    if t in small_words:
+        return True
+
+    # Check relaxed smalltalk patterns
+    if re.fullmatch(r"h+i+", t):  # matches hi, hii, hiii, hhhiiiii
+        return True
+    if re.fullmatch(r"he+y+", t): # hey, heyy, heyyy
+        return True
+
+    return False
 
 # ---------------- OCR & DOC QA (UNCHANGED) ----------------
 def is_ocr_query(text):
