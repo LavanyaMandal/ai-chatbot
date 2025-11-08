@@ -1,4 +1,5 @@
 // Clean, stable, externals-ready UI script
+const API = "https://ai-chatbot-ishk.onrender.com";
 
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -82,7 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
     host.appendChild(card);
 
     snooze.onclick = async ()=>{
-      await fetch("/reminders-ack", {
+      await fetch(`${API}/reminders-ack`, {
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ id: rem.id, snooze_minutes: 5 })
@@ -90,7 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
       card.remove();
     };
     done.onclick = async ()=>{
-      await fetch("/reminders-ack", {
+      await fetch(`${API}/reminders-ack`, {
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ id: rem.id })
@@ -154,7 +155,7 @@ document.addEventListener("DOMContentLoaded", () => {
     showTyping();
 
     try {
-      const res = await fetch("/chat", {
+      const res = await fetch(`${API}/chat`, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
@@ -175,7 +176,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       bot(String(data.reply || ""));
 
-      // ✅ Play audio if a URL exists
       if (data.audio_url) {
         try {
           let audio = new Audio(data.audio_url);
@@ -203,7 +203,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // New chat
   $("newChat").onclick = async () => {
     showTyping();
-    await fetch("/chat", {
+    await fetch(`${API}/chat`, {
       method: "POST",
       headers: {"Content-Type":"application/json"},
       body: JSON.stringify({ message: "clear" })
@@ -213,9 +213,11 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   // Export / Delete
-  $("exportData").onclick = () => window.open("/export-data", "_blank");
+  $("exportData").onclick = () =>
+    window.open(`${API}/export-data`, "_blank");
+
   $("deleteData").onclick = async () => {
-    await fetch("/delete-data", {method: "DELETE"});
+    await fetch(`${API}/delete-data`, {method: "DELETE"});
     location.reload();
   };
 
@@ -226,18 +228,23 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!f) return;
     const fd = new FormData();
     fd.append("file", f);
-    const endpoint = f.type.startsWith("image") ? "/upload-image" : "/upload-doc";
+
+    const endpoint = f.type.startsWith("image")
+      ? `${API}/upload-image`
+      : `${API}/upload-doc`;
+
     showTyping();
     const r = await fetch(endpoint, {method:"POST", body: fd});
     const d = await r.json();
     hideTyping();
+
     if (d.error) bot("⚠️ " + d.error);
     if (d.message) bot(d.message);
     if (d.analysis) bot(d.analysis);
     if (d.ocr_text) bot("OCR captured.");
   };
 
-  // Speech recognition (UNCHANGED)
+  // Speech recognition
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SR && $("micBtn")){
     const rec = new SR();
@@ -254,7 +261,7 @@ document.addEventListener("DOMContentLoaded", () => {
     $("dashboardModal").classList.remove("hidden");
     $("remList").textContent = "Loading...";
     try{
-      const r = await fetch("/dashboard");
+      const r = await fetch(`${API}/dashboard`);
       const data = await r.json();
       $("remList").innerHTML = (Array.isArray(data) && data.length)
         ? data.map(x => `✅ ${escapeHtml(x.task || "")}`).join("<br>")
@@ -269,7 +276,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const v = $("newReminder").value.trim();
     if (!v) return;
     try{
-      const r = await fetch("/chat", {
+      const r = await fetch(`${API}/chat`, {
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ message: "remind me " + v })
@@ -282,31 +289,28 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  // ---------- OS Notifications + polling (A) ----------
+  // ---------- OS Notifications + polling ----------
   async function setupNotifications(){
     if (!("serviceWorker" in navigator)) return;
 
-    // register service worker
     try {
       await navigator.serviceWorker.register("/static/sw.js");
-    } catch (e) {
-      console.log("SW register failed:", e);
-    }
+    } catch (e) {}
 
-    // ask permission
     if (window.Notification && Notification.permission === "default"){
       try { await Notification.requestPermission(); } catch (_) {}
     }
 
-    // polling loop
     async function poll(){
       try{
-        const r = await fetch("/reminders-due");
+        const r = await fetch(`${API}/reminders-due`);
         if (!r.ok) throw new Error("HTTP "+r.status);
         const due = await r.json();
+
         if (Array.isArray(due) && due.length){
           const reg = await navigator.serviceWorker.getRegistration();
           for (const rem of due){
+
             if (reg && Notification.permission === "granted"){
               reg.showNotification("⏰ Reminder", {
                 body: (rem.task || "").replace(/^remind( me)?/i,"").trim() || rem.task,
@@ -319,8 +323,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 ]
               });
             }
+
             showReminderToast(rem);
-            await fetch("/reminders-ack", {
+
+            await fetch(`${API}/reminders-ack`, {
               method:"POST",
               headers:{"Content-Type":"application/json"},
               body: JSON.stringify({ id: rem.id })
@@ -328,7 +334,6 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
       }catch(e){
-        // silent
       }finally{
         setTimeout(poll, 15000);
       }
@@ -359,12 +364,10 @@ self.addEventListener("notificationclick", (event) => {
   if (!id) return;
 
   let body = { id };
-  if (action === "snooze-5") {
-    body.snooze_minutes = 5;
-  }
+  if (action === "snooze-5") body.snooze_minutes = 5;
 
   event.waitUntil(
-    fetch("/reminders-ack", {
+    fetch(`${API}/reminders-ack`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
@@ -372,5 +375,4 @@ self.addEventListener("notificationclick", (event) => {
   );
 });
 
-// optional: clear notifications on close (no network)
 self.addEventListener("notificationclose", () => {});
